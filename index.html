@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>고교 내신 5등급제 계산기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      background-color: #F8FAFC;
+      color: #1E293B;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] { -moz-appearance: textfield; }
+    .card-shadow {
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-24">
+
+  <!-- 헤더 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-xl shadow-sm">
+          5
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-none">고교 내신 5등급제 계산기</h1>
+          <p class="text-xs text-slate-500 mt-1">2028 대입 개편 · NEIS 중간석차 백분율 기준</p>
+        </div>
+      </div>
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        Google Sheets 연동
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+
+    <!-- 상단: 전교생 수 & 등급컷 표 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- 기준 인원 입력 -->
+      <section class="lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">STEP 01</span>
+            <span class="text-xs text-slate-400">필수 기준값</span>
+          </div>
+          <h2 class="text-lg font-bold text-slate-800 mb-1">수강자 수 (전교생 수)</h2>
+          <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+            전교생 수를 입력하면 5등급제 예상 인원수와 누적인원이 실시간 계산됩니다.
+          </p>
+
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">기준 인원 입력</label>
+          <div class="relative flex items-center">
+            <input 
+              type="number" 
+              id="totalStudents" 
+              value="200" 
+              min="1" 
+              placeholder="예: 250"
+              oninput="handlePopulationChange()"
+              class="w-full pl-4 pr-12 py-3 text-xl font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            >
+            <span class="absolute right-4 text-sm font-semibold text-slate-400">명</span>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span>반올림 기준</span>
+          <span class="font-medium text-slate-700">NEIS 표준 (소수 첫째 자리 반올림)</span>
+        </div>
+      </section>
+
+      <!-- 5등급제 등급컷 안내 표 -->
+      <section class="lg:col-span-8 bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">GRADE CUT</span>
+            <h2 class="text-lg font-bold text-slate-800">5등급제 인원 기준표</h2>
+          </div>
+          <span class="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">전체 5개 등급</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500 text-xs">
+                <th class="py-2.5 px-3 font-semibold">등급</th>
+                <th class="py-2.5 px-3 font-semibold">누적 비율(컷)</th>
+                <th class="py-2.5 px-3 font-semibold text-right">구간 예상 인원</th>
+                <th class="py-2.5 px-3 font-semibold text-right">누적 인원수</th>
+              </tr>
+            </thead>
+            <tbody id="gradeCutTableBody" class="divide-y divide-slate-100">
+              <!-- JS 동적 렌더링 -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- 과목별 성적 입력 -->
+    <section class="bg-white rounded-2xl p-6 border border-slate-200/80 card-shadow">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-100">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">STEP 02</span>
+          <h2 class="text-lg font-bold text-slate-800">과목별 성적 입력</h2>
+          <p class="text-xs text-slate-500 mt-0.5">과목명, 단위, 내 석차, 동석차 수를 입력하면 중간석차 백분율과 등급이 자동 계산됩니다.</p>
+        </div>
+        <button 
+          type="button" 
+          onclick="addSubjectRow()"
+          class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          과목 추가
+        </button>
+      </div>
+
+      <!-- 입력 테이블 -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm min-w-[640px]">
+          <thead>
+            <tr class="bg-slate-50 text-slate-600 text-xs font-semibold rounded-t-xl">
+              <th class="py-3 px-3 rounded-l-xl">과목명</th>
+              <th class="py-3 px-3 w-24">단위수</th>
+              <th class="py-3 px-3 w-28">내 석차</th>
+              <th class="py-3 px-3 w-28">동석차 수</th>
+              <th class="py-3 px-3 text-center w-36">산출 등급</th>
+              <th class="py-3 px-2 text-center w-12 rounded-r-xl">삭제</th>
+            </tr>
+          </thead>
+          <tbody id="subjectTableBody" class="divide-y divide-slate-100">
+            <!-- 행 동적 생성 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 전체 성적 요약 카드 -->
+    <section class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-6 sm:p-8 card-shadow">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">SUMMARY RESULT</span>
+          <h3 class="text-xl font-bold mt-1">전체 성적 종합 결과</h3>
+          <p class="text-xs text-slate-300 mt-1">단위수를 가중 적용한 전체 평균 등급입니다.</p>
+        </div>
+
+        <div class="flex items-center gap-4 sm:gap-8 bg-white/10 px-6 py-4 rounded-2xl backdrop-blur-sm border border-white/10">
+          <div class="text-center">
+            <span class="text-xs text-slate-300 block mb-1">총 이수단위</span>
+            <span id="summaryTotalCredits" class="text-2xl sm:text-3xl font-black text-white">0</span>
+            <span class="text-xs text-slate-300">단위</span>
+          </div>
+          <div class="w-px h-10 bg-white/20"></div>
+          <div class="text-center">
+            <span class="text-xs text-emerald-300 font-semibold block mb-1">가중 평균 등급</span>
+            <span id="summaryAvgGrade" class="text-3xl sm:text-4xl font-black text-emerald-400">-</span>
+            <span class="text-xs text-emerald-300 font-semibold">등급</span>
+          </div>
+        </div>
+
+        <div>
+          <button 
+            type="button" 
+            id="saveBtn"
+            onclick="saveToGoogleSheets()"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all text-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+            구글 시트에 기록 저장하기
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 알림 메시지 (토스트) -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 max-w-sm px-5 py-4 rounded-xl text-sm font-medium shadow-2xl transition-all z-50"></div>
+  </main>
+
+  <script>
+    // 5등급제 누적 컷 기준
+    const GRADE_TIERS = [
+      { grade: 1, cut: 10,  label: '1등급', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+      { grade: 2, cut: 34,  label: '2등급', badge: 'bg-teal-100 text-teal-800 border-teal-300' },
+      { grade: 3, cut: 66,  label: '3등급', badge: 'bg-blue-100 text-blue-800 border-blue-300' },
+      { grade: 4, cut: 90,  label: '4등급', badge: 'bg-amber-100 text-amber-800 border-amber-300' },
+      { grade: 5, cut: 100, label: '5등급', badge: 'bg-rose-100 text-rose-800 border-rose-300' }
+    ];
+
+    let subjectCount = 0;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderGradeCutTable();
+      // 초기 기본 3과목 행 생성
+      addSubjectRow('국어', 4, 12, 1);
+      addSubjectRow('수학', 4, 25, 2);
+      addSubjectRow('영어', 4, 8, 1);
+    });
+
+    function handlePopulationChange() {
+      renderGradeCutTable();
+      calculateAll();
+    }
+
+    // 등급컷 인원수 테이블 렌더링
+    function renderGradeCutTable() {
+      const total = Math.max(1, parseInt(document.getElementById('totalStudents').value) || 200);
+      const tbody = document.getElementById('gradeCutTableBody');
+      tbody.innerHTML = '';
+
+      let prevCut = 0;
+      let prevCumCount = 0;
+
+      GRADE_TIERS.forEach(t => {
+        const cumCount = Math.round((total * t.cut) / 100);
+        const segmentCount = cumCount - prevCumCount;
+        prevCumCount = cumCount;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/80 transition-colors';
+        tr.innerHTML = `
+          <td class="py-2.5 px-3">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${t.badge} border">
+              ${t.label}
+            </span>
+          </td>
+          <td class="py-2.5 px-3 text-slate-700 font-medium">상위 ${prevCut}% ~ ${t.cut}%</td>
+          <td class="py-2.5 px-3 text-right font-semibold text-slate-800">${segmentCount}명</td>
+          <td class="py-2.5 px-3 text-right font-bold text-emerald-700">${cumCount}명</td>
+        `;
+        tbody.appendChild(tr);
+        prevCut = t.cut;
+      });
+    }
+
+    // 과목 행 추가
+    function addSubjectRow(name = '', credits = 4, rank = '', tieCount = 1) {
+      subjectCount++;
+      const id = subjectCount;
+      const tbody = document.getElementById('subjectTableBody');
+
+      const tr = document.createElement('tr');
+      tr.id = `row-${id}`;
+      tr.className = 'hover:bg-slate-50/50 transition-colors';
+      tr.innerHTML = `
+        <td class="py-2.5 px-3">
+          <input type="text" class="sub-name w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="예: 공통국어" value="${name}">
+        </td>
+        <td class="py-2.5 px-3">
+          <input type="number" min="1" max="20" class="sub-credits w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 text-center font-semibold" value="${credits}" oninput="calculateAll()">
+        </td>
+        <td class="py-2.5 px-3">
+          <input type="number" min="1" class="sub-rank w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 text-center font-semibold text-slate-800" placeholder="석차" value="${rank}" oninput="calculateAll()">
+        </td>
+        <td class="py-2.5 px-3">
+          <input type="number" min="1" class="sub-tie w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 text-center font-semibold text-slate-500" placeholder="1" value="${tieCount}" oninput="calculateAll()">
+        </td>
+        <td class="py-2.5 px-3 text-center">
+          <div class="result-badge flex flex-col items-center justify-center">
+            <span class="grade-pill inline-block px-2.5 py-1 rounded-full text-xs font-extrabold bg-slate-100 text-slate-500">-</span>
+            <span class="pct-text text-[11px] text-slate-400 mt-0.5">상위 -%</span>
+          </div>
+        </td>
+        <td class="py-2.5 px-2 text-center">
+          <button type="button" onclick="removeSubjectRow(${id})" class="text-slate-400 hover:text-rose-500 transition-colors p-1" title="과목 삭제">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      calculateAll();
+    }
+
+    function removeSubjectRow(id) {
+      const row = document.getElementById(`row-${id}`);
+      if (row) row.remove();
+      calculateAll();
+    }
+
+    // 전체 등급 및 평균 계산
+    function calculateAll() {
+      const totalStudents = Math.max(1, parseInt(document.getElementById('totalStudents').value) || 200);
+      const rows = document.querySelectorAll('#subjectTableBody tr');
+
+      let sumWeightedGrade = 0;
+      let sumCredits = 0;
+
+      rows.forEach(row => {
+        const credits = parseFloat(row.querySelector('.sub-credits').value) || 0;
+        const rank = parseFloat(row.querySelector('.sub-rank').value);
+        const tie = Math.max(1, parseFloat(row.querySelector('.sub-tie').value) || 1);
+        const pill = row.querySelector('.grade-pill');
+        const pctText = row.querySelector('.pct-text');
+
+        if (!rank || rank < 1) {
+          pill.className = 'grade-pill inline-block px-2.5 py-1 rounded-full text-xs font-extrabold bg-slate-100 text-slate-500';
+          pill.textContent = '-';
+          pctText.textContent = '상위 -%';
+          row.dataset.grade = '';
+          row.dataset.percentile = '';
+          return;
+        }
+
+        // NEIS 중간석차 공식: 석차 + (동석차 - 1) / 2
+        const midRank = rank + (tie - 1) / 2;
+        const percentile = Math.min(100, Math.max(0, (midRank / totalStudents) * 100));
+
+        // 5등급 판정
+        let matchedTier = GRADE_TIERS.find(t => percentile <= t.cut) || GRADE_TIERS[GRADE_TIERS.length - 1];
+
+        pill.className = `grade-pill inline-block px-2.5 py-1 rounded-full text-xs font-extrabold ${matchedTier.badge} border`;
+        pill.textContent = `${matchedTier.grade}등급`;
+        pctText.textContent = `상위 ${percentile.toFixed(2)}%`;
+
+        row.dataset.grade = matchedTier.grade;
+        row.dataset.percentile = percentile.toFixed(2);
+
+        if (credits > 0) {
+          sumWeightedGrade += matchedTier.grade * credits;
+          sumCredits += credits;
+        }
+      });
+
+      // 요약 카드 업데이트
+      document.getElementById('summaryTotalCredits').textContent = sumCredits;
+      if (sumCredits > 0) {
+        const avg = (sumWeightedGrade / sumCredits).toFixed(2);
+        document.getElementById('summaryAvgGrade').textContent = avg;
+      } else {
+        document.getElementById('summaryAvgGrade').textContent = '-';
+      }
+    }
+
+    // 구글 시트 저장 연동
+    function saveToGoogleSheets() {
+      const totalStudents = parseInt(document.getElementById('totalStudents').value) || 200;
+      const totalCredits = parseInt(document.getElementById('summaryTotalCredits').textContent) || 0;
+      const avgGrade = parseFloat(document.getElementById('summaryAvgGrade').textContent);
+
+      const rows = document.querySelectorAll('#subjectTableBody tr');
+      const subjects = [];
+
+      rows.forEach(row => {
+        const name = row.querySelector('.sub-name').value.trim() || '미지정과목';
+        const credits = parseFloat(row.querySelector('.sub-credits').value) || 0;
+        const rank = parseFloat(row.querySelector('.sub-rank').value);
+        const tieCount = parseFloat(row.querySelector('.sub-tie').value) || 1;
+        const grade = row.dataset.grade ? parseInt(row.dataset.grade) : null;
+        const percentile = row.dataset.percentile ? parseFloat(row.dataset.percentile) : null;
+
+        if (grade !== null && credits > 0) {
+          subjects.push({ name, credits, rank, tieCount, grade, percentile });
+        }
+      });
+
+      if (subjects.length === 0) {
+        showToast('저장할 유효한 과목 성적이 없습니다. 석차를 입력해 주세요.', 'error');
+        return;
+      }
+
+      const saveBtn = document.getElementById('saveBtn');
+      const originalBtnText = saveBtn.innerHTML;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        시트에 기록 저장 중...
+      `;
+
+      const payload = { totalStudents, totalCredits, avgGrade, subjects };
+
+      // Google Apps Script 네이티브 호출
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(res => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalBtnText;
+            if (res.success) {
+              showToast(res.message, 'success');
+            } else {
+              showToast(res.message, 'error');
+            }
+          })
+          .withFailureHandler(err => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalBtnText;
+            showToast('저장 중 통신 오류가 발생했습니다: ' + err.message, 'error');
+          })
+          .saveGradeRecords(payload);
+      } else {
+        // 로컬 테스트 환경 안내
+        setTimeout(() => {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = originalBtnText;
+          showToast('구글 앱스 스크립트 배포 환경에서 실행하시면 스프레드시트에 즉시 저장됩니다.', 'info');
+        }, 800);
+      }
+    }
+
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.className = 'fixed bottom-6 right-6 max-w-sm px-5 py-3.5 rounded-xl text-sm font-semibold shadow-2xl transition-all z-50 flex items-center gap-2 ';
+      if (type === 'success') {
+        toast.className += 'bg-emerald-600 text-white';
+      } else if (type === 'error') {
+        toast.className += 'bg-rose-600 text-white';
+      } else {
+        toast.className += 'bg-slate-800 text-white';
+      }
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => { toast.classList.add('hidden'); }, 3500);
+    }
+  </script>
+</body>
+</html>
